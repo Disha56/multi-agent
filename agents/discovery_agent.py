@@ -1,7 +1,7 @@
 # agents/discovery_agent.py
 import time, traceback, requests
 from services.google_places import is_enabled as gp_enabled, search_places_google, get_place_details
-from services.geoapify import is_enabled as ga_enabled, search_places_geoapify
+# from services.geoapify import is_enabled as ga_enabled, search_places_geoapify
 from services.web_search import duckduckgo_search_urls
 from services.site_scraper import extract_social_links, extract_emails_and_phones
 
@@ -82,29 +82,29 @@ class DiscoveryAgent:
                 self._log("Google error:", traceback.format_exc())
         time.sleep(0.3)
 
-        # 2) Geoapify fallback
-        if ga_enabled() and len(results) < limit:
-            try:
-                q = f"{business_type} {city}"
-                self._log("Geoapify enabled; querying")
-                # ga = search_places_geoapify(q, limit=(limit - len(results)))
-                ga = search_places_geoapify(business_type, loc[0], loc[1], radius_km*1000, limit=(limit - len(results)))
-                for r in ga:
-                    item = {
-                        "name": r.get("name"),
-                        "lat": r.get("lat"),
-                        "lng": r.get("lng"),
-                        "address": r.get("address"),
-                        "phone": r.get("phone"),
-                        "website": r.get("website"),
-                        "raw": r.get("raw")
-                    }
-                    add(item, "geoapify")
-                if len(results) >= limit:
-                    return results[:limit]
-            except Exception:
-                self._log("Geoapify error:", traceback.format_exc())
-        time.sleep(0.3)
+        # # 2) Geoapify fallback
+        # if ga_enabled() and len(results) < limit:
+        #     try:
+        #         q = f"{business_type} {city}"
+        #         self._log("Geoapify enabled; querying")
+        #         # ga = search_places_geoapify(q, limit=(limit - len(results)))
+        #         ga = search_places_geoapify(business_type, loc[0], loc[1], radius_km*1000, limit=(limit - len(results)))
+        #         for r in ga:
+        #             item = {
+        #                 "name": r.get("name"),
+        #                 "lat": r.get("lat"),
+        #                 "lng": r.get("lng"),
+        #                 "address": r.get("address"),
+        #                 "phone": r.get("phone"),
+        #                 "website": r.get("website"),
+        #                 "raw": r.get("raw")
+        #             }
+        #             add(item, "geoapify")
+        #         if len(results) >= limit:
+        #             return results[:limit]
+        #     except Exception:
+        #         self._log("Geoapify error:", traceback.format_exc())
+        # time.sleep(0.3)
 
         # 3) DuckDuckGo / website fallback and enrichment
         if len(results) < limit:
