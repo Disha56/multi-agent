@@ -12,6 +12,7 @@ import smtplib
 from email.message import EmailMessage
 from dotenv import load_dotenv
 load_dotenv()
+from db.helpers import get_connection
 
 st.set_page_config(layout="wide")
 st.title("AlphaNeuron — Local Business Lead Finder (India)")

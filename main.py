@@ -1,48 +1,83 @@
+# # main_fetch.py
+# import argparse
+# from agents.discovery_agent import DiscoveryAgent
+# from utils.db import init_db, SessionLocal, upsert_business
+# import time
+
+# def cli():
+#     parser = argparse.ArgumentParser()
+#     parser.add_argument("--type", required=True, help="Business type, e.g., 'dental clinic'")
+#     parser.add_argument("--city", required=True, help="City name, e.g., 'Ahmedabad'")
+#     parser.add_argument("--limit", type=int, default=10)
+#     args = parser.parse_args()
+
+#     init_db()
+#     session = SessionLocal()
+#     disc = DiscoveryAgent()
+#     items = disc.run(args.type, args.city, limit=args.limit)
+#     printed = 0
+#     for it in items:
+#         lead = {
+#             "name": it.get("name"),
+#             "address": it.get("address"),
+#             "lat": it.get("lat"),
+#             "lng": it.get("lng"),
+#             "phone": it.get("phone"),
+#             "email": it.get("email"),
+#             "website": it.get("website"),
+#             "instagram": it.get("instagram"),
+#             "linkedin": it.get("linkedin"),
+#             "meta": {}
+#         }
+#         obj, created = upsert_business(session, lead)
+#         printed += 1
+#         print(f"[Saved {'NEW' if created else 'UPDATED'}] {obj.id} | {obj.name} | {lead.get('phone') or ''} | {lead.get('instagram') or lead.get('linkedin') or ''}")
+#     print(f"Done. {printed} items processed.")
+
+# if __name__ == "__main__":
+#     cli()
+
+
+
 # main.py
 import argparse
-from agents.orchestrator import Orchestrator
-from utils.db import SessionLocal, fetch_all_businesses
-import csv
-import os
+from agents.discovery_agent import DiscoveryAgent
+from db.crud import upsert_business
+from db.setup_db import initialize_db
 
-def cli():
-    parser = argparse.ArgumentParser(description="Local AI-Agent Business Finder")
-    parser.add_argument("--type", type=str, required=True, help="Business type to search (e.g., 'dental clinic')")
-    parser.add_argument("--city", type=str, required=True, help="City name (e.g., Ahmedabad)")
-    parser.add_argument("--limit", type=int, default=8, help="Number of businesses to process")
-    parser.add_argument("--export-csv", type=str, default="", help="If provided, path to CSV file to export results after run")
-    parser.add_argument("--language", type=str, default="en", help="Language for generated pitch: 'en' or 'hi'")
-    args = parser.parse_args()
-    orch = Orchestrator()
-    out = orch.run(args.type, args.city, limit=args.limit)
-    print("Done. Results saved to local SQLite database (data/businesses.db).")
-    for o in out:
-        print(o["name"], "-", o["meta"]["score"]["grade"], "-> pitch length:", len(o["meta"].get("pitch","")))
-
-    if args.export_csv:
-        session = SessionLocal()
-        rows = fetch_all_businesses(session)
-        # flatten minimal set for CSV
-        fieldnames = ["id", "name", "lat", "lng", "address", "grade", "opportunity_score", "pitch"]
-        os.makedirs(os.path.dirname(args.export_csv) or ".", exist_ok=True)
-        with open(args.export_csv, "w", newline="", encoding="utf-8") as fh:
-            writer = csv.DictWriter(fh, fieldnames=fieldnames)
-            writer.writeheader()
-            for r in rows:
-                meta = r.get("meta", {})
-                score = meta.get("score", {})
-                pitch = meta.get("pitch", "")
-                writer.writerow({
-                    "id": r.get("id"),
-                    "name": r.get("name"),
-                    "lat": r.get("lat"),
-                    "lng": r.get("lng"),
-                    "address": r.get("address"),
-                    "grade": score.get("grade"),
-                    "opportunity_score": score.get("opportunity_score"),
-                    "pitch": pitch
-                })
-        print(f"Exported CSV to {args.export_csv}")
+def run_and_save(business_type, city, limit=10, radius_km=5):
+    initialize_db()
+    disc = DiscoveryAgent()
+    items = disc.run(business_type, city, limit=limit, radius_km=radius_km)
+    if not items:
+        print("Done. 0 items processed.")
+        return
+    processed = 0
+    for it in items:
+        lead = {
+            "name": it.get("name"),
+            "address": it.get("address"),
+            "lat": it.get("lat"),
+            "lng": it.get("lng"),
+            "phone": it.get("phone"),
+            "email": it.get("email"),
+            "website": it.get("website"),
+            "instagram": it.get("instagram"),
+            "linkedin": it.get("linkedin"),
+            "city": city,
+            "type": business_type,
+            "source": it.get("source")
+        }
+        bid, created = upsert_business(lead)
+        print(f"[Saved {'NEW' if created else 'UPDATED'}] {bid} | {lead.get('name')} | {lead.get('phone') or ''} | {lead.get('instagram') or lead.get('linkedin') or ''}")
+        processed += 1
+    print(f"Done. {processed} items processed.")
 
 if __name__ == "__main__":
-    cli()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--type", required=True)
+    parser.add_argument("--city", required=True)
+    parser.add_argument("--limit", type=int, default=10)
+    parser.add_argument("--radius_km", type=int, default=5)
+    args = parser.parse_args()
+    run_and_save(args.type, args.city, limit=args.limit, radius_km=args.radius_km)
